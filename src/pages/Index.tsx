@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
-import func2url from '../../backend/func2url.json';
-
-const AUTH_URL = (func2url as Record<string, string>).auth;
+const AUTH_URL = 'https://functions.poehali.dev/6e9947a2-55b1-4132-aa98-695f7717fe3c';
 
 type User = { id: number; name: string; email: string; role: string };
 

@@ -23,6 +23,24 @@ def _resp(status: int, body: dict) -> dict:
     return {'statusCode': status, 'headers': CORS, 'isBase64Encoded': False, 'body': json.dumps(body)}
 
 
+def _ensure_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            email VARCHAR(200) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(30) NOT NULL DEFAULT 'member',
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        INSERT INTO users (name, email, password_hash, role)
+        VALUES ('DezeYT', 'dezeyt', %s, 'owner')
+        ON CONFLICT (email) DO NOTHING
+    """, (_hash('ermolovo4'),))
+
+
 def _user_dict(row) -> dict:
     return {'id': row[0], 'name': row[1], 'email': row[2], 'role': row[3]}
 
@@ -50,6 +68,8 @@ def handler(event: dict, context) -> dict:
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     try:
         cur = conn.cursor()
+        _ensure_table(cur)
+        conn.commit()
 
         if action == 'register':
             name = (data.get('name') or '').strip()
