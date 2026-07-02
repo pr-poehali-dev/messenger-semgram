@@ -1,5 +1,10 @@
 import { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
+import func2url from '../../backend/func2url.json';
+
+const AUTH_URL = (func2url as Record<string, string>).auth;
+
+type User = { id: number; name: string; email: string; role: string };
 
 type Message = {
   id: number;
@@ -22,43 +27,36 @@ type Chat = {
   messages: Message[];
 };
 
-const CHATS: Chat[] = [
-  {
-    id: 1, name: 'Команда дизайна', role: 'Рабочая группа · 6', avatar: 'Palette', color: 'from-fuchsia-500 to-purple-600',
-    online: true, last: 'Скинул новые макеты в PDF', time: '14:32', unread: 2,
-    messages: [
-      { id: 1, fromMe: false, text: 'Привет! Как продвигается новый экран онбординга?', time: '14:20' },
-      { id: 2, fromMe: true, text: 'Почти готово, отправляю превью 👇', time: '14:24' },
-      { id: 3, fromMe: true, time: '14:25', file: { name: 'onboarding-preview.png', kind: 'image', size: '2.4 МБ' } },
-      { id: 4, fromMe: false, text: 'Огонь! Давай ещё в PDF полную версию', time: '14:30' },
-      { id: 5, fromMe: false, time: '14:32', file: { name: 'design-system-v3.pdf', kind: 'doc', size: '8.1 МБ' } },
-    ],
-  },
-  {
-    id: 2, name: 'Анна Соколова', role: 'Product Manager', avatar: 'User', color: 'from-cyan-400 to-blue-600',
-    online: true, last: 'Обсудим спринт в 16:00?', time: '13:10', unread: 0,
-    messages: [
-      { id: 1, fromMe: false, text: 'Обсудим спринт в 16:00?', time: '13:10' },
-      { id: 2, fromMe: true, text: 'Да, буду на связи', time: '13:12' },
-    ],
-  },
-  {
-    id: 3, name: 'Разработка', role: 'Рабочая группа · 12', avatar: 'Code', color: 'from-emerald-400 to-teal-600',
-    online: false, last: 'Деплой прошёл успешно ✅', time: '11:45', unread: 5,
-    messages: [
-      { id: 1, fromMe: false, text: 'Деплой прошёл успешно ✅', time: '11:45' },
-      { id: 2, fromMe: false, time: '11:46', file: { name: 'release-notes.docx', kind: 'doc', size: '340 КБ' } },
-    ],
-  },
-  {
-    id: 4, name: 'Максим Орлов', role: 'CTO', avatar: 'Rocket', color: 'from-orange-400 to-rose-600',
-    online: false, last: 'Отличная работа, команда!', time: 'Вчера', unread: 0,
-    messages: [{ id: 1, fromMe: false, text: 'Отличная работа, команда!', time: 'Вчера' }],
-  },
-];
+const Login = ({ onEnter }: { onEnter: (u: User) => void }) => {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-const Login = ({ onEnter }: { onEnter: () => void }) => {
-  const [mode, setMode] = useState<'login' | 'register'>('register');
+  const submit = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${AUTH_URL}?action=${mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Ошибка. Попробуйте ещё раз');
+        return;
+      }
+      onEnter(data.user);
+    } catch {
+      setError('Сервер недоступен. Попробуйте позже');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       <div className="absolute -top-40 -left-40 w-[32rem] h-[32rem] rounded-full brand-gradient animate-gradient-move blur-[120px] opacity-40 animate-float" />
@@ -76,8 +74,8 @@ const Login = ({ onEnter }: { onEnter: () => void }) => {
         </div>
 
         <div className="flex gap-2 p-1 rounded-2xl bg-secondary/50 mb-7">
-          {(['register', 'login'] as const).map((m) => (
-            <button key={m} onClick={() => setMode(m)}
+          {(['login', 'register'] as const).map((m) => (
+            <button key={m} onClick={() => { setMode(m); setError(''); }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode === m ? 'brand-gradient text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}>
               {m === 'register' ? 'Регистрация' : 'Вход'}
             </button>
@@ -86,16 +84,22 @@ const Login = ({ onEnter }: { onEnter: () => void }) => {
 
         <div className="space-y-4">
           {mode === 'register' && (
-            <Field icon="User" placeholder="Имя и фамилия" />
+            <Field icon="User" placeholder="Имя и фамилия" value={name} onChange={setName} />
           )}
-          <Field icon="Mail" placeholder="Email" type="email" />
-          <Field icon="Lock" placeholder="Пароль" type="password" />
+          <Field icon="Mail" placeholder="Email или логин" value={email} onChange={setEmail} />
+          <Field icon="Lock" placeholder="Пароль" type="password" value={password} onChange={setPassword} onEnter={submit} />
         </div>
 
-        <button onClick={onEnter}
-          className="w-full mt-7 py-3.5 rounded-2xl brand-gradient animate-gradient-move text-white font-bold shadow-xl hover:scale-[1.02] active:scale-95 transition-transform flex items-center justify-center gap-2">
-          {mode === 'register' ? 'Создать аккаунт' : 'Войти'}
-          <Icon name="ArrowRight" size={18} />
+        {error && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-xl px-4 py-3 animate-fade-in">
+            <Icon name="CircleAlert" size={16} /> {error}
+          </div>
+        )}
+
+        <button onClick={submit} disabled={loading}
+          className="w-full mt-7 py-3.5 rounded-2xl brand-gradient animate-gradient-move text-white font-bold shadow-xl hover:scale-[1.02] active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-60">
+          {loading ? 'Секунду...' : mode === 'register' ? 'Создать аккаунт' : 'Войти'}
+          {!loading && <Icon name="ArrowRight" size={18} />}
         </button>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
@@ -106,26 +110,34 @@ const Login = ({ onEnter }: { onEnter: () => void }) => {
   );
 };
 
-const Field = ({ icon, placeholder, type = 'text' }: { icon: string; placeholder: string; type?: string }) => (
+const Field = ({ icon, placeholder, type = 'text', value, onChange, onEnter }: {
+  icon: string; placeholder: string; type?: string; value: string; onChange: (v: string) => void; onEnter?: () => void;
+}) => (
   <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-secondary/40 border border-border focus-within:border-primary/60 transition-colors">
     <Icon name={icon} size={18} className="text-muted-foreground" />
-    <input type={type} placeholder={placeholder}
+    <input type={type} placeholder={placeholder} value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
       className="bg-transparent outline-none text-sm flex-1 placeholder:text-muted-foreground" />
   </div>
 );
 
-const Messenger = ({ onLogout }: { onLogout: () => void }) => {
-  const [chats, setChats] = useState(CHATS);
-  const [activeId, setActiveId] = useState(1);
+const ROLE_LABEL: Record<string, string> = { owner: 'Владелец', admin: 'Администратор', member: 'Участник' };
+
+const Messenger = ({ user, onLogout }: { user: User; onLogout: () => void }) => {
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
   const [search, setSearch] = useState('');
   const [showProfile, setShowProfile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const active = chats.find((c) => c.id === activeId)!;
+  const initials = user.name.slice(0, 2).toUpperCase();
+  const active = chats.find((c) => c.id === activeId) || null;
   const filtered = chats.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
 
   const send = (msg: Message) => {
+    if (!activeId) return;
     setChats((prev) => prev.map((c) => c.id === activeId ? { ...c, messages: [...c.messages, msg], last: msg.text || 'Файл', time: msg.time } : c));
   };
 
@@ -164,7 +176,7 @@ const Messenger = ({ onLogout }: { onLogout: () => void }) => {
             <span className="font-display font-black text-xl">sem<span className="text-gradient">Gramm</span></span>
           </div>
           <button onClick={() => setShowProfile(true)} className="w-9 h-9 rounded-full brand-gradient flex items-center justify-center text-white text-sm font-bold hover:scale-105 transition-transform">
-            Я
+            {initials}
           </button>
         </div>
 
@@ -177,7 +189,15 @@ const Messenger = ({ onLogout }: { onLogout: () => void }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-1">
-          {filtered.map((c, i) => (
+          {filtered.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-6 py-10">
+              <div className="w-16 h-16 rounded-3xl bg-secondary/60 flex items-center justify-center mb-4">
+                <Icon name="MessagesSquare" size={28} className="text-muted-foreground" />
+              </div>
+              <p className="text-sm font-semibold mb-1">Пока нет чатов</p>
+              <p className="text-xs text-muted-foreground">Добавьте контакт, чтобы начать общение</p>
+            </div>
+          ) : filtered.map((c, i) => (
             <button key={c.id} onClick={() => setActiveId(c.id)}
               style={{ animationDelay: `${i * 60}ms` }}
               className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all animate-slide-up text-left ${activeId === c.id ? 'glass-strong' : 'hover:bg-secondary/40'}`}>
@@ -208,75 +228,89 @@ const Messenger = ({ onLogout }: { onLogout: () => void }) => {
 
       {/* Chat window */}
       <main className="hidden md:flex flex-1 flex-col relative z-10">
-        <header className="flex items-center justify-between p-4 glass border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${active.color} flex items-center justify-center`}>
-              <Icon name={active.avatar} size={20} className="text-white" />
-            </div>
-            <div>
-              <div className="font-semibold text-sm">{active.name}</div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                {active.online && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                {active.online ? 'В сети' : active.role}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {['Phone', 'Video', 'MoreVertical'].map((ic) => (
-              <button key={ic} className="w-9 h-9 rounded-xl hover:bg-secondary/60 flex items-center justify-center text-muted-foreground transition-colors">
-                <Icon name={ic} size={18} />
-              </button>
-            ))}
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-3">
-          {active.messages.map((m) => (
-            <div key={m.id} className={`flex ${m.fromMe ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-              <div className={`max-w-[70%] rounded-3xl px-4 py-2.5 ${m.fromMe ? 'brand-gradient text-white rounded-br-lg' : 'glass-strong rounded-bl-lg'}`}>
-                {m.text && <p className="text-sm leading-relaxed">{m.text}</p>}
-                {m.file?.kind === 'image' && (
-                  <div className="mt-1 rounded-2xl overflow-hidden w-56">
-                    {m.file.url
-                      ? <img src={m.file.url} alt={m.file.name} className="w-full object-cover" />
-                      : <div className="w-full h-36 bg-gradient-to-br from-fuchsia-500/40 to-cyan-500/40 flex items-center justify-center"><Icon name="Image" size={32} className="text-white/80" /></div>}
-                    <div className="text-[11px] mt-1 opacity-80">{m.file.name} · {m.file.size}</div>
+        {active ? (
+          <>
+            <header className="flex items-center justify-between p-4 glass border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${active.color} flex items-center justify-center`}>
+                  <Icon name={active.avatar} size={20} className="text-white" />
+                </div>
+                <div>
+                  <div className="font-semibold text-sm">{active.name}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    {active.online && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                    {active.online ? 'В сети' : active.role}
                   </div>
-                )}
-                {m.file?.kind === 'doc' && (
-                  <div className="mt-1 flex items-center gap-3 min-w-52">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                      <Icon name="FileText" size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{m.file.name}</div>
-                      <div className="text-[11px] opacity-80">{m.file.size}</div>
-                    </div>
-                    <Icon name="Download" size={18} className="ml-auto opacity-80" />
-                  </div>
-                )}
-                <div className={`text-[10px] mt-1 ${m.fromMe ? 'text-white/70' : 'text-muted-foreground'} text-right`}>{m.time}</div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+              <div className="flex items-center gap-1">
+                {['Phone', 'Video', 'MoreVertical'].map((ic) => (
+                  <button key={ic} className="w-9 h-9 rounded-xl hover:bg-secondary/60 flex items-center justify-center text-muted-foreground transition-colors">
+                    <Icon name={ic} size={18} />
+                  </button>
+                ))}
+              </div>
+            </header>
 
-        <footer className="p-4 glass border-t border-border">
-          <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" hidden onChange={onFile} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
-            <button onClick={() => fileRef.current?.click()}
-              className="w-11 h-11 rounded-2xl bg-secondary/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0">
-              <Icon name="Paperclip" size={20} />
-            </button>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendText()}
-              placeholder="Написать сообщение..."
-              className="flex-1 bg-secondary/50 border border-border rounded-2xl px-4 py-3 text-sm outline-none focus:border-primary/60 transition-colors placeholder:text-muted-foreground" />
-            <button onClick={sendText}
-              className="w-11 h-11 rounded-2xl brand-gradient animate-gradient-move flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-transform shrink-0">
-              <Icon name="Send" size={18} />
-            </button>
+            <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-3">
+              {active.messages.map((m) => (
+                <div key={m.id} className={`flex ${m.fromMe ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+                  <div className={`max-w-[70%] rounded-3xl px-4 py-2.5 ${m.fromMe ? 'brand-gradient text-white rounded-br-lg' : 'glass-strong rounded-bl-lg'}`}>
+                    {m.text && <p className="text-sm leading-relaxed">{m.text}</p>}
+                    {m.file?.kind === 'image' && (
+                      <div className="mt-1 rounded-2xl overflow-hidden w-56">
+                        {m.file.url
+                          ? <img src={m.file.url} alt={m.file.name} className="w-full object-cover" />
+                          : <div className="w-full h-36 bg-gradient-to-br from-fuchsia-500/40 to-cyan-500/40 flex items-center justify-center"><Icon name="Image" size={32} className="text-white/80" /></div>}
+                        <div className="text-[11px] mt-1 opacity-80">{m.file.name} · {m.file.size}</div>
+                      </div>
+                    )}
+                    {m.file?.kind === 'doc' && (
+                      <div className="mt-1 flex items-center gap-3 min-w-52">
+                        <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                          <Icon name="FileText" size={20} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{m.file.name}</div>
+                          <div className="text-[11px] opacity-80">{m.file.size}</div>
+                        </div>
+                        <Icon name="Download" size={18} className="ml-auto opacity-80" />
+                      </div>
+                    )}
+                    <div className={`text-[10px] mt-1 ${m.fromMe ? 'text-white/70' : 'text-muted-foreground'} text-right`}>{m.time}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <footer className="p-4 glass border-t border-border">
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" hidden onChange={onFile} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
+                <button onClick={() => fileRef.current?.click()}
+                  className="w-11 h-11 rounded-2xl bg-secondary/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                  <Icon name="Paperclip" size={20} />
+                </button>
+                <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendText()}
+                  placeholder="Написать сообщение..."
+                  className="flex-1 bg-secondary/50 border border-border rounded-2xl px-4 py-3 text-sm outline-none focus:border-primary/60 transition-colors placeholder:text-muted-foreground" />
+                <button onClick={sendText}
+                  className="w-11 h-11 rounded-2xl brand-gradient animate-gradient-move flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-transform shrink-0">
+                  <Icon name="Send" size={18} />
+                </button>
+              </div>
+            </footer>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+            <div className="w-20 h-20 rounded-3xl brand-gradient animate-gradient-move flex items-center justify-center mb-5 animate-float">
+              <Icon name="MessageCircle" size={36} className="text-white" />
+            </div>
+            <h2 className="font-display font-bold text-xl mb-2">Добро пожаловать, {user.name}!</h2>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Добавьте первый контакт, чтобы начать рабочую переписку в semGramm
+            </p>
           </div>
-        </footer>
+        )}
       </main>
 
       {/* Profile panel */}
@@ -292,11 +326,11 @@ const Messenger = ({ onLogout }: { onLogout: () => void }) => {
             </div>
 
             <div className="flex flex-col items-center mb-8">
-              <div className="w-24 h-24 rounded-3xl brand-gradient animate-gradient-move flex items-center justify-center text-white text-3xl font-black shadow-xl mb-4">Я</div>
-              <div className="font-display font-bold text-lg">Ваш аккаунт</div>
-              <div className="text-sm text-muted-foreground">you@semgramm.com</div>
-              <span className="mt-2 px-3 py-1 rounded-full bg-emerald-400/15 text-emerald-400 text-xs font-medium flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> В сети
+              <div className="w-24 h-24 rounded-3xl brand-gradient animate-gradient-move flex items-center justify-center text-white text-3xl font-black shadow-xl mb-4">{initials}</div>
+              <div className="font-display font-bold text-lg">{user.name}</div>
+              <div className="text-sm text-muted-foreground">{user.email}</div>
+              <span className="mt-2 px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold flex items-center gap-1.5">
+                <Icon name="Crown" size={13} /> {ROLE_LABEL[user.role] || user.role}
               </span>
             </div>
 
@@ -330,8 +364,8 @@ const Messenger = ({ onLogout }: { onLogout: () => void }) => {
 };
 
 const Index = () => {
-  const [logged, setLogged] = useState(false);
-  return logged ? <Messenger onLogout={() => setLogged(false)} /> : <Login onEnter={() => setLogged(true)} />;
+  const [user, setUser] = useState<User | null>(null);
+  return user ? <Messenger user={user} onLogout={() => setUser(null)} /> : <Login onEnter={setUser} />;
 };
 
 export default Index;
