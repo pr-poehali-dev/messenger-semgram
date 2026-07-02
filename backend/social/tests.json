@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Search users",
+      "method": "POST",
+      "path": "/?action=search",
+      "body": { "q": "dez", "me_id": 0 },
+      "expectedStatus": 200,
+      "expectedBody": { "users": [] },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "All users as owner",
+      "method": "POST",
+      "path": "/?action=all_users",
+      "body": { "me_id": 1 },
+      "expectedStatus": 200,
+      "expectedBody": { "users": [] },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
